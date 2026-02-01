@@ -126,7 +126,7 @@ def clear() -> None:
         os.system('clear')
 
 
-def set_audio_tags(filename, artists, genres, name, album_name, release_year, disc_number, track_number) -> None:
+def set_audio_tags(filename, artists, genres, name, album_name, release_year, disc_number, track_number, lyrics) -> None:
     """ sets music_tag metadata """
     tags = music_tag.load_file(filename)
     tags[ALBUMARTIST] = artists[0]
@@ -137,6 +137,8 @@ def set_audio_tags(filename, artists, genres, name, album_name, release_year, di
     tags[YEAR] = release_year
     tags[DISCNUMBER] = disc_number
     tags[TRACKNUMBER] = track_number
+    if(lyrics!=''):
+        tags['lyrics'] = lyrics
     tags.save()
 
 
@@ -154,6 +156,7 @@ def set_music_thumbnail(filename, image_url) -> None:
 
 
 def regex_input_for_urls(search_input) -> Tuple[str, str, str, str, str, str]:
+    search_input = search_input.replace('intl-fr/','')
     """ Since many kinds of search may be passed at the command line, process them all here. """
     track_uri_search = re.search(
         r'^spotify:track:(?P<TrackID>[0-9a-zA-Z]{22})$', search_input)

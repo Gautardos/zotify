@@ -6,6 +6,20 @@ import requests
 from librespot.audio.decoders import VorbisOnlyAudioQuality
 from librespot.core import Session
 
+from zotify.tokenmanager import SpotifyTokenManager
+
+# Lazily initialized token manager
+_token_manager = None
+
+def get_token_manager():
+    global _token_manager
+    if _token_manager is None:
+        _token_manager = SpotifyTokenManager(
+            client_id=Config.get_spotify_client_id(),
+            client_secret=Config.get_spotify_client_secret()
+        )
+    return _token_manager
+
 from zotify.const import TYPE, \
     PREMIUM, USER_READ_EMAIL, OFFSET, LIMIT, \
     PLAYLIST_READ_PRIVATE, USER_LIBRARY_READ, USER_FOLLOW_READ
@@ -54,9 +68,7 @@ class Zotify:
 
     @classmethod
     def __get_auth_token(cls):
-        return cls.SESSION.tokens().get_token(
-            USER_READ_EMAIL, PLAYLIST_READ_PRIVATE, USER_LIBRARY_READ, USER_FOLLOW_READ
-        ).access_token
+        return get_token_manager().get_token()
 
     @classmethod
     def get_auth_header(cls):
@@ -64,9 +76,11 @@ class Zotify:
             'Authorization': f'Bearer {cls.__get_auth_token()}',
             'Accept-Language': f'{cls.CONFIG.get_language()}',
             'Accept': 'application/json',
-            'app-platform': 'WebPlayer'
+            'Content-Type': 'application/json',
+            'app-platform': 'WebPlayer',
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
         }
-
+    
     @classmethod
     def get_auth_header_and_params(cls, limit, offset):
         return {
@@ -87,6 +101,7 @@ class Zotify:
         # we need to import that here, otherwise we will get circular imports!
         from zotify.termoutput import Printer, PrintChannel
         headers = cls.get_auth_header()
+    
         response = requests.get(url, headers=headers)
         responsetext = response.text
         try:
@@ -108,3 +123,46 @@ class Zotify:
     def check_premium(cls) -> bool:
         """ If user has spotify premium return true """
         return (cls.SESSION.get_user_attribute(TYPE) == PREMIUM)
+    
+    #AJOUTS POUR UTILISER TOKEN PAR DEFAUT POUR LES LYRICS
+
+    @classmethod
+    def __get_generic_auth_token(cls):
+        return cls.SESSION.tokens().get_token(
+            USER_READ_EMAIL, PLAYLIST_READ_PRIVATE, USER_LIBRARY_READ, USER_FOLLOW_READ
+        ).access_token
+    
+    @classmethod
+    def get_auth_header_for_lyrics(cls):
+        return {
+            'Authorization': f'Bearer {cls.__get_generic_auth_token()}',
+            'Accept-Language': f'{cls.CONFIG.get_language()}',
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'app-platform': 'WebPlayer',
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+        }
+
+    @classmethod
+    def invoke_lyrics_url(cls, url, tryCount=0):
+        # we need to import that here, otherwise we will get circular imports!
+        from zotify.termoutput import Printer, PrintChannel
+        headers = cls.get_auth_header_for_lyrics()
+
+        response = requests.get(url, headers=headers)
+        responsetext = response.text
+        try:
+            responsejson = response.json()
+        except json.decoder.JSONDecodeError:
+            responsejson = {"error": {"status": "unknown", "message": "received an empty response"}}
+
+        if not responsejson or 'error' in responsejson:
+            if tryCount < (cls.CONFIG.get_retry_attempts() - 1):
+                Printer.print(PrintChannel.WARNINGS, f"Spotify API Error (try {tryCount + 1}) ({responsejson['error']['status']}): {responsejson['error']['message']}")
+                time.sleep(5)
+                return cls.invoke_url(url, tryCount + 1)
+
+            Printer.print(PrintChannel.API_ERRORS, f"Spotify API Error ({responsejson['error']['status']}): {responsejson['error']['message']}")
+
+        return responsetext, responsejson
+

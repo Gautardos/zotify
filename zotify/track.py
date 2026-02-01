@@ -49,7 +49,7 @@ def get_followed_artists() -> list:
 def get_song_info(song_id) -> Tuple[List[str], List[Any], str, str, Any, Any, Any, Any, Any, Any, int]:
     """ Retrieves metadata for downloaded songs """
     with Loader(PrintChannel.PROGRESS_INFO, "Fetching track information..."):
-        (raw, info) = Zotify.invoke_url(f'{TRACKS_URL}?ids={song_id}&market=from_token')
+        (raw, info) = Zotify.invoke_url(f'{TRACKS_URL}?ids={song_id}&market=US')
 
     if not TRACKS in info:
         raise ValueError(f'Invalid response from TRACKS_URL:\n{raw}')
@@ -105,27 +105,30 @@ def get_song_genres(rawartists: List[str], track_name: str) -> List[str]:
 
 
 def get_song_lyrics(song_id: str, file_save: str) -> None:
-    raw, lyrics = Zotify.invoke_url(f'https://spclient.wg.spotify.com/color-lyrics/v2/track/{song_id}')
+    raw, lyrics = Zotify.invoke_lyrics_url(f'https://spclient.wg.spotify.com/color-lyrics/v2/track/{song_id}')
 
     if lyrics:
         try:
             formatted_lyrics = lyrics['lyrics']['lines']
+            lyrics_string = ''
         except KeyError:
             raise ValueError(f'Failed to fetch lyrics: {song_id}')
         if(lyrics['lyrics']['syncType'] == "UNSYNCED"):
-            with open(file_save, 'w+', encoding='utf-8') as file:
-                for line in formatted_lyrics:
-                    file.writelines(line['words'] + '\n')
-            return
+            #with open(file_save, 'w+', encoding='utf-8') as file:
+            for line in formatted_lyrics:
+                #file.writelines(line['words'] + '\n')
+                lyrics_string += line['words'] + '\n'
+            return lyrics_string
         elif(lyrics['lyrics']['syncType'] == "LINE_SYNCED"):
-            with open(file_save, 'w+', encoding='utf-8') as file:
-                for line in formatted_lyrics:
-                    timestamp = int(line['startTimeMs'])
-                    ts_minutes = str(math.floor(timestamp / 60000)).zfill(2)
-                    ts_seconds = str(math.floor((timestamp % 60000) / 1000)).zfill(2)
-                    ts_millis = str(math.floor(timestamp % 1000))[:2].zfill(2)
-                    file.writelines(f'[{ts_minutes}:{ts_seconds}.{ts_millis}]' + line['words'] + '\n')
-            return
+            #with open(file_save, 'w+', encoding='utf-8') as file:
+            for line in formatted_lyrics:
+                timestamp = int(line['startTimeMs'])
+                ts_minutes = str(math.floor(timestamp / 60000)).zfill(2)
+                ts_seconds = str(math.floor((timestamp % 60000) / 1000)).zfill(2)
+                ts_millis = str(math.floor(timestamp % 1000))[:2].zfill(2)
+                #file.writelines(f'[{ts_minutes}:{ts_seconds}.{ts_millis}]' + line['words'] + '\n')
+                lyrics_string += f'[{ts_minutes}:{ts_seconds}.{ts_millis}]' + line['words'] + '\n'
+            return lyrics_string
     raise ValueError(f'Failed to fetch lyrics: {song_id}')
 
 
@@ -253,15 +256,16 @@ def download_track(mode: str, track_id: str, extra_keys=None, disable_progressba
                     time_downloaded = time.time()
 
                     genres = get_song_genres(raw_artists, name)
+                    lyrics = ''
 
                     if(Zotify.CONFIG.get_download_lyrics()):
                         try:
-                            get_song_lyrics(track_id, PurePath(str(filename)[:-3] + "lrc"))
+                            lyrics = get_song_lyrics(track_id, PurePath(str(filename)[:-3] + "lrc"))
                         except ValueError:
                             Printer.print(PrintChannel.SKIPS, f"###   Skipping lyrics for {song_name}: lyrics not available   ###")
                     convert_audio_format(filename_temp)
                     try:
-                        set_audio_tags(filename_temp, artists, genres, name, album_name, release_year, disc_number, track_number)
+                        set_audio_tags(filename_temp, artists, genres, name, album_name, release_year, disc_number, track_number, lyrics)
                         set_music_thumbnail(filename_temp, image_url)
                     except Exception:
                         Printer.print(PrintChannel.ERRORS, "Unable to write metadata, ensure ffmpeg is installed and added to your PATH.")
@@ -298,7 +302,7 @@ def download_track(mode: str, track_id: str, extra_keys=None, disable_progressba
 
 def convert_audio_format(filename) -> None:
     """ Converts raw audio into playable file """
-    temp_filename = f'{PurePath(filename).parent}.tmp'
+    temp_filename = f'{PurePath(filename)}.tmp'
     Path(filename).replace(temp_filename)
 
     download_format = Zotify.CONFIG.get_download_format().lower()

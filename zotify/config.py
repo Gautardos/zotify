@@ -36,6 +36,8 @@ PRINT_WARNINGS = 'PRINT_WARNINGS'
 RETRY_ATTEMPTS = 'RETRY_ATTEMPTS'
 CONFIG_VERSION = 'CONFIG_VERSION'
 DOWNLOAD_LYRICS = 'DOWNLOAD_LYRICS'
+SPOTIFY_CLIENT_ID = 'SPOTIFY_CLIENT_ID'
+SPOTIFY_CLIENT_SECRET = 'SPOTIFY_CLIENT_SECRET'
 
 CONFIG_VALUES = {
     SAVE_CREDENTIALS:           { 'default': 'True',  'type': bool, 'arg': '--save-credentials'           },
@@ -68,7 +70,9 @@ CONFIG_VALUES = {
     PRINT_API_ERRORS:           { 'default': 'True',  'type': bool, 'arg': '--print-api-errors'           },
     PRINT_PROGRESS_INFO:        { 'default': 'True',  'type': bool, 'arg': '--print-progress-info'        },
     PRINT_WARNINGS:             { 'default': 'True',  'type': bool, 'arg': '--print-warnings'             },
-    TEMP_DOWNLOAD_DIR:          { 'default': '',      'type': str,  'arg': '--temp-download-dir'          }
+    TEMP_DOWNLOAD_DIR:          { 'default': '',      'type': str,  'arg': '--temp-download-dir'          },
+    SPOTIFY_CLIENT_ID:          { 'default': '',      'type': str,  'arg': '--client-id' },
+    SPOTIFY_CLIENT_SECRET:      { 'default': '',      'type': str,  'arg': '--client-secret' }
 }
 
 OUTPUT_DEFAULT_PLAYLIST = '{playlist}/{artist} - {song_name}.{ext}'
@@ -120,6 +124,13 @@ class Config:
         for key in CONFIG_VALUES:
             if key.lower() in vars(args) and vars(args)[key.lower()] is not None:
                 cls.Values[key] = cls.parse_arg_value(key, vars(args)[key.lower()])
+
+        # Override from environment variables
+        import os
+        for key in CONFIG_VALUES:
+            env_key = f'ZOTIFY_{key}'
+            if env_key in os.environ:
+                cls.Values[key] = cls.parse_arg_value(key, os.environ[env_key])
 
         if args.no_splash:
             cls.Values[PRINT_SPLASH] = False
@@ -308,3 +319,11 @@ class Config:
     @classmethod
     def get_retry_attempts(cls) -> int:
         return cls.get(RETRY_ATTEMPTS)
+
+    @classmethod
+    def get_spotify_client_id(cls) -> str:
+        return cls.get(SPOTIFY_CLIENT_ID)
+
+    @classmethod
+    def get_spotify_client_secret(cls) -> str:
+        return cls.get(SPOTIFY_CLIENT_SECRET)
