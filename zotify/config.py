@@ -120,10 +120,10 @@ class Config:
                 cls.Values[key] = cls.parse_arg_value(key, CONFIG_VALUES[key]['default'])
 
         # Override config from commandline arguments
-
         for key in CONFIG_VALUES:
-            if key.lower() in vars(args) and vars(args)[key.lower()] is not None:
-                cls.Values[key] = cls.parse_arg_value(key, vars(args)[key.lower()])
+            arg_name = CONFIG_VALUES[key]['arg'].replace('--', '').replace('-', '_')
+            if arg_name in vars(args) and vars(args)[arg_name] is not None:
+                cls.Values[key] = cls.parse_arg_value(key, vars(args)[arg_name])
 
         # Override from environment variables
         import os
