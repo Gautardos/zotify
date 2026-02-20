@@ -49,32 +49,32 @@ def get_followed_artists() -> list:
 def get_song_info(song_id) -> Tuple[List[str], List[Any], str, str, Any, Any, Any, Any, Any, Any, int]:
     """ Retrieves metadata for downloaded songs """
     with Loader(PrintChannel.PROGRESS_INFO, "Fetching track information..."):
-        (raw, info) = Zotify.invoke_url(f'{TRACKS_URL}?ids={song_id}&market=US')
+        (raw, info) = Zotify.invoke_url(f'{TRACKS_URL}/{song_id}')
 
-    if not TRACKS in info:
+    if not info or 'error' in info:
         raise ValueError(f'Invalid response from TRACKS_URL:\n{raw}')
 
     try:
         artists = []
-        for data in info[TRACKS][0][ARTISTS]:
+        for data in info[ARTISTS]:
             artists.append(data[NAME])
 
-        album_name = info[TRACKS][0][ALBUM][NAME]
-        name = info[TRACKS][0][NAME]
-        release_year = info[TRACKS][0][ALBUM][RELEASE_DATE].split('-')[0]
-        disc_number = info[TRACKS][0][DISC_NUMBER]
-        track_number = info[TRACKS][0][TRACK_NUMBER]
-        scraped_song_id = info[TRACKS][0][ID]
-        is_playable = info[TRACKS][0][IS_PLAYABLE]
-        duration_ms = info[TRACKS][0][DURATION_MS]
+        album_name = info[ALBUM][NAME]
+        name = info[NAME]
+        release_year = info[ALBUM][RELEASE_DATE].split('-')[0]
+        disc_number = info[DISC_NUMBER]
+        track_number = info[TRACK_NUMBER]
+        scraped_song_id = info[ID]
+        is_playable = info.get(IS_PLAYABLE, True)
+        duration_ms = info[DURATION_MS]
 
-        image = info[TRACKS][0][ALBUM][IMAGES][0]
-        for i in info[TRACKS][0][ALBUM][IMAGES]:
+        image = info[ALBUM][IMAGES][0]
+        for i in info[ALBUM][IMAGES]:
             if i[WIDTH] > image[WIDTH]:
                 image = i
         image_url = image[URL]
 
-        return artists, info[TRACKS][0][ARTISTS], album_name, name, image_url, release_year, disc_number, track_number, scraped_song_id, is_playable, duration_ms
+        return artists, info[ARTISTS], album_name, name, image_url, release_year, disc_number, track_number, scraped_song_id, is_playable, duration_ms
     except Exception as e:
         raise ValueError(f'Failed to parse TRACKS_URL response: {str(e)}\n{raw}')
 
